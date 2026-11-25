@@ -221,7 +221,8 @@
     hud.setStatus = (status, info = {}) => {
       banner.hidden = status !== "unreachable";
       setText(banner, status === "unreachable"
-        ? "Can't reach the agent feed" + (info.error ? " (" + info.error + ")" : "") + ". Showing the last snapshot; retrying."
+        ? "Can't reach the agent feed" + (info.error ? " (" + info.error + ")" : "") +
+          (hud.doc ? ". Showing the last snapshot; retrying." : ". Retrying.")
         : "");
     };
     hud.panel = panel;

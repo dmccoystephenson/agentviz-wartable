@@ -2,6 +2,7 @@
 from a transcript leaves the feed except what these functions return."""
 import os
 import re
+from urllib.parse import urlsplit
 
 LABEL_MAX = 48
 REDACTED = "[redacted]"
@@ -9,14 +10,22 @@ REDACTED = "[redacted]"
 # the model's own words and can quote a command). Replaced before any label
 # leaves the feed.
 _SECRET_PATTERNS = [re.compile(pattern, re.IGNORECASE) for pattern in (
-    r"\bsk-[a-z0-9_-]{8,}",                       # Anthropic / OpenAI style keys
-    r"\bgh[pousr]_[a-z0-9]{16,}",                 # GitHub tokens
+    r"-----BEGIN [A-Z ]*PRIVATE KEY-----?",          # PEM private keys
+    r"\b(sk|rk|pk)[-_](live|test|ant|proj)?[-_]?[a-z0-9_-]{8,}",  # Anthropic / OpenAI / Stripe keys
+    r"\bgh[pousr]_[a-z0-9]{16,}",                   # GitHub tokens
     r"\bgithub_pat_[a-z0-9_]{16,}",
-    r"\bxox[abprs]-[a-z0-9-]{8,}",                # Slack tokens
-    r"\bAKIA[0-9A-Z]{16}\b",                       # AWS access key ids
-    r"\b(bearer|basic)\s+[a-z0-9._~+/=-]{8,}",      # Authorization header values
-    r"\b(token|secret|password|passwd|api[_-]?key)\s*[=:]\s*\S+",
-    r"\b[a-f0-9]{32,}\b",                          # long hex secrets
+    r"\bglpat-[a-z0-9_-]{16,}",                     # GitLab tokens
+    r"\bnpm_[a-z0-9]{20,}",                         # npm tokens
+    r"\bxox[abprs]-[a-z0-9-]{8,}",                  # Slack tokens
+    r"\bAIza[0-9a-z_-]{20,}",                       # Google API keys
+    r"\bAKIA[0-9A-Z]{16}\b",                         # AWS access key ids
+    r"\beyJ[a-z0-9_-]{8,}\.eyJ[a-z0-9_-]{8,}\.[a-z0-9_-]+",  # JWTs
+    r"(?<=://)[^/\s:@]+:[^/\s@]+(?=@)",             # credentials inside a URL
+    r"\b(bearer|basic)\s+[a-z0-9._~+/=-]{8,}",        # Authorization header values
+    r"[a-z0-9_]*(token|secret|passwd|password|api[_-]?key|access[_-]?key)\s*[=:]\s*\S+",  # NAME=value, incl. GH_TOKEN=, PGPASSWORD=
+    r"--?(token|secret|password|passwd|api[_-]?key)[=\s]+\S+",  # --token value
+    r"\bapi\s+key\s*[=:]\s*\S+",
+    r"\b[a-f0-9]{32,}\b",                            # long hex secrets
 )]
 _FILE_TOOLS = ("Edit", "Write", "MultiEdit", "Read", "NotebookEdit")
 
@@ -47,15 +56,25 @@ def tool_label(name, tool_input):
         description = tool_input.get("description")
         return short_label(description) if isinstance(description, str) and description else None
     if name == "WebFetch":
-        match = re.match(r"https?://([^/:?#]+)", str(tool_input.get("url") or ""))
-        return match.group(1) if match else None
+        return _web_host(tool_input.get("url"))
     return None
+
+
+def _web_host(url):
+    """The host of an http(s) URL, never its user name or password."""
+    try:
+        parsed = urlsplit(str(url or ""))
+    except ValueError:
+        return None
+    if parsed.scheme not in ("http", "https"):
+        return None
+    return parsed.hostname or None
 
 
 def place_of(cwd, home=None):
     """(id, label) of the place a working directory belongs to: its basename,
-    or "~" for the home directory. Gardener cache clones are named
-    Owner__Repo; the label keeps only the repo."""
+    or "~" for the home directory. A directory named Owner__Repo (a common
+    naming for cache clones) is labelled with the repo part only."""
     home = home or os.path.expanduser("~")
     if not cwd or os.path.normpath(os.path.expanduser(cwd)) == os.path.normpath(home):
         return "~", "home"

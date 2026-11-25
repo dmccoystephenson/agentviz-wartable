@@ -131,7 +131,8 @@
     }
 
     function accept(raw) {
-      const doc = options.transform ? options.transform(raw, feed.polls) : raw;
+      let doc = raw;
+      if (options.transform) callPageHook("transform", () => { doc = options.transform(raw, feed.polls); });
       const changes = diff(feed.doc, doc);
       const now = clock();
       for (const id of changes.toolCalls) toolSeenAt.set(id, now);
@@ -140,8 +141,18 @@
       feed.failures = 0;
       feed.lastError = null;
       setStatus("live");
-      if (options.onUpdate) options.onUpdate(doc, changes);
+      callPageHook("onUpdate", () => options.onUpdate && options.onUpdate(doc, changes));
       return changes;
+    }
+
+    // A page's own hook throwing is a page bug, not a feed failure: log it so it
+    // is visible, and keep the feed live.
+    function callPageHook(name, fn) {
+      try {
+        fn();
+      } catch (error) {
+        console.error("agentviz: the page's " + name + " threw", error);
+      }
     }
 
     function reject(error) {

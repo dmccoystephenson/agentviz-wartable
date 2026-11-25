@@ -7,13 +7,18 @@ The committed engine (`web/wartable-engine.js`, `web/wartable-engine.wasm`) and
 the page scripts `web/strata-kit.js` and `web/strata-loader.js` are built from
 or copied out of the [Strata](https://github.com/Preponderous-Software/strata)
 0.10.0 wasm release, which is MIT-licensed and bundles the libraries listed
-below. `web/wartable-engine.js` also contains the Emscripten runtime (emsdk
-6.0.11), which is MIT-licensed (or University of Illinois/NCSA, at your
-option): https://github.com/emscripten-core/emscripten/blob/main/LICENSE.
+below.
 
 `vendor/agentfeed/` and `vendor/agentviz-kit/` (and the `web/agentviz-*`
 copies) come from [agentviz](https://github.com/dmccoystephenson/agentviz),
 MIT, same author.
+
+## Emscripten runtime and C/C++ libraries
+
+The engine (`web/wartable-engine.js`, `web/wartable-engine.wasm`) is built with emsdk
+6.0.11 and contains the Emscripten runtime, musl libc, libc++ and libc++abi.
+Their licence texts are in
+[vendor/agentviz-kit/NOTICES-emscripten.md](vendor/agentviz-kit/NOTICES-emscripten.md).
 
 ## Strata (MIT)
 
