@@ -1,136 +1,123 @@
-// Regenerates every README image in docs/media/ from the FIXTURE feed.
-//
-//   python3 -m vendor.agentfeed serve --web web --port 8950 --fixture &
-//   NODE_PATH=/root/arcade-watch/node_modules node tests/screenshots.cjs [url] [only]
-//
-// Stills use ?drive=1 so scene time is fixed and frames repeat; the GIF steps
-// scene time at 10 fps and is assembled with Pillow (python3). Never point
-// this at a live feed: README images must show the demo feed only.
-"use strict";
-const {chromium} = require("playwright");
-const fs = require("fs");
-const path = require("path");
+// Regenerates every README image in docs/media/ from the DEMO feed (never live):
+//   npm run screenshots [-- name ...]
+// Stills are drawn with ?drive=1 (the kit draws one frame on demand at a given
+// scene time), so they repeat. The GIF steps scene time frame by frame while
+// pushing two scripted changes (a scout making camp, a new tool call) and is
+// encoded with Pillow (tests/make_gif.py: a palette per frame).
 const {execFileSync} = require("child_process");
+const fs = require("fs");
+const os = require("os");
+const path = require("path");
+const h = require("../vendor/agentviz-kit/tests/harness.cjs");
+const screens = require("../vendor/agentviz-kit/tests/screens.cjs");
 
-const base = (process.argv[2] || "http://127.0.0.1:8950/").replace(/\/?$/, "/");
-const only = process.argv[3] || "";
-const media = path.join(__dirname, "..", "docs", "media");
-fs.mkdirSync(media, {recursive: true});
+const REPO = path.resolve(__dirname, "..");
+const MEDIA = path.join(REPO, "docs/media");
+const PORT = Number(process.env.WARTABLE_TEST_PORT || 9134);
+const READY = "window.__page && window.__page.polls > 0 && window.__table.banners.length > 0";
+const only = new Set(process.argv.slice(2));
+const want = (name) => only.size === 0 || only.has(name);
+const DESKTOP = {viewport: {width: 1600, height: 900}};
+const PHONE = {viewport: {width: 390, height: 844}, dpr: 3, mobile: true};
 
-const ARGS = ["--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist"];
+// Camera helpers run in the page: frame a banner or scout by id, or the whole table.
+const HELPERS = `
+window.__shots = {
+  t: 6.3,
+  settle() { for (let t = 0.5; t <= 6; t += 0.5) window.__page.kit.drive(t); },
+  cam(c) { Object.assign(window.__page.kit.cam, c); },
+  home(c) { window.__page.fit(true); this.cam(c || {}); },
+  at(id, c) { const o = window.__page.byId(id);
+    this.cam(Object.assign({yaw: Math.PI / 2, tx: o.x + (c.dx || 0), ty: c.ty || 0.6, tz: o.z + (c.dz || 0)}, c)); },
+  between(a, b, c) { const p = window.__page.byId(a), q = window.__page.byId(b);
+    this.cam(Object.assign({yaw: Math.PI / 2, tx: (p.x + q.x) / 2, ty: 0.6, tz: (p.z + q.z) / 2}, c)); },
+  // Look at id from the side away from \`from\`, so that one is not in the way.
+  away(id, from, c) { const o = window.__page.byId(id), f = window.__page.byId(from);
+    this.at(id, Object.assign({yaw: Math.atan2(o.z - f.z, o.x - f.x) + (c.turn || 0)}, c)); },
+  draw() { window.__page.kit.drive(window.__shots.t); },
+};`;
 
-const settle = (page, secs = 4) => page.evaluate((secs) => {
-  for (let i = 0; i < secs * 10; i++) window.__wartable.frame(i / 10, 0.1);
-}, secs);
-
-async function open(browser, {width, height, dpr = 1, mobile = false}) {
-  const ctx = await browser.newContext({viewport: {width, height}, deviceScaleFactor: dpr, isMobile: mobile, hasTouch: mobile});
-  const page = await ctx.newPage();
-  const errors = [];
-  page.on("console", (m) => { if (m.type() === "error") errors.push(m.text()); });
-  page.on("pageerror", (e) => errors.push(String(e)));
-  await page.goto(base + "?fixture=1&drive=1&quality=1", {waitUntil: "commit"});
-  await page.waitForFunction(() => window.__strataKit && window.__strataKit.ready && window.__wartable &&
-    window.__wartable.doc, null, {timeout: 120000});
-  // Let the easing settle without drawing (each drawn frame is seconds of
-  // SwiftShader work): advance the page's state only.
-  await settle(page);
-  return {ctx, page, errors};
+async function openPage(browser, server, options) {
+  const opened = await h.open(browser, `${server.base}/?fixture=1&drive=1`, Object.assign({ready: READY}, options));
+  await h.stillAnimations(opened.page);
+  await opened.page.evaluate(() => window.__page.stopPolling());
+  await opened.page.evaluate(HELPERS);
+  await opened.page.evaluate(() => window.__shots.settle());
+  return opened;
 }
 
-// Positions of banners/scouts by id, for close-ups.
-const where = (page, id) => page.evaluate((id) => {
-  const w = window.__wartable, o = w.banners.get(id) || w.scouts.get(id);
-  return o ? {x: o.x, z: o.z} : null;
-}, id);
-
-async function still(page, file, cam, t = 6.3, select = undefined) {
-  try {
-    await stillOnce(page, file, cam, t, select);
-  } catch (e) {  // SwiftShader occasionally stalls one capture: try once more
-    console.warn("retrying", file, String(e.message || e).split("\n")[0]);
-    await stillOnce(page, file, cam, t, select);
-  }
+async function shoot(page, name, setup) {
+  if (!want(name)) return;
+  await page.evaluate(setup);
+  await screens.still(page, path.join(MEDIA, name + ".png"), () => window.__shots.draw());
 }
 
-async function stillOnce(page, file, cam, t, select) {
-  await page.evaluate(({cam, t, select}) => {
-    if (select !== undefined) window.__wartableSelect(select);
-    const c = window.__strataKit.cam;
-    Object.assign(c, cam);
-    window.__strataKit.drive(t);
-  }, {cam, t, select});
-  // Labels show and hide with a short hysteresis: draw again once it has passed.
-  await page.waitForTimeout(450);
-  await page.evaluate((t) => window.__strataKit.drive(t), t);
-  await page.screenshot({path: path.join(media, file), timeout: 600000});
-  console.log("wrote", file);
+const DESKTOP_SHOTS = [
+  ["hero", "window.__page.select(null); window.__shots.home()"],
+  ["angle-low", "window.__shots.home(); window.__shots.cam({yaw: Math.PI / 2 + 0.9, pitch: 0.42, dist: window.__page.kit.cam.dist * 1.0})"],
+  ["angle-top", "window.__shots.home(); window.__shots.cam({pitch: 1.42, dist: window.__page.kit.cam.dist * 1.05})"],
+  ["closeup-lead", "window.__shots.at('demo-lead-b', {yaw: Math.PI / 2 + 0.25, pitch: 0.7, dist: 13})"],
+  ["closeup-waiting", "window.__shots.away('demo-waiting', 'demo-stalled', {turn: 0.5, pitch: 0.5, dist: 10, dx: -0.6, ty: 1.2})"],
+  ["closeup-question", "window.__shots.at('demo-asker', {yaw: Math.PI / 2 - 0.2, pitch: 0.5, dist: 11, dx: -0.6, ty: 1.4})"],
+  ["closeup-idle-offline", "window.__shots.between('demo-idle', 'demo-offline-2', {pitch: 0.6, dist: 10, ty: 0.8})"],
+  ["closeup-resting", "window.__shots.away('demo-lead-a/demo-a5', 'demo-lead-a', {pitch: 0.6, dist: 6, ty: 0.3})"],
+  ["closeup-stalled-scout", "window.__shots.away('demo-lead-b/demo-b7', 'demo-lead-b', {pitch: 0.55, dist: 6.5, ty: 0.6})"],
+  ["closeup-actions", "window.__shots.between('demo-solo', 'demo-thinker', {pitch: 0.6, dist: 11, ty: 0.8})"],
+  ["panel-desktop", "window.__shots.at('demo-lead-b', {pitch: 0.8, dist: 18, dx: 2}); window.__page.select('demo-lead-b', false)"],
+  ["panel-scout", "window.__shots.at('demo-lead-b/demo-b6', {pitch: 0.7, dist: 10, dx: 1.5}); window.__page.select('demo-lead-b/demo-b6', false)"],
+];
+
+async function desktopStills(browser, server) {
+  const {ctx, page, errors} = await openPage(browser, server, DESKTOP);
+  for (const [name, setup] of DESKTOP_SHOTS) await shoot(page, name, setup);
+  h.assertNoErrors(errors);
+  await ctx.close();
 }
 
-(async () => {
-  const browser = await chromium.launch({args: ARGS});
-  const want = (n) => !only || only.split(",").includes(n);
-  try {
-    {
-      const {ctx, page, errors} = await open(browser, {width: 1600, height: 900});
-      const home = await page.evaluate(() => Object.assign({}, window.__strataKit.cam));
-      if (want("hero")) await still(page, "hero.png", home);
-      if (want("angles")) {
-        await still(page, "angle-low.png", Object.assign({}, home, {yaw: home.yaw + 0.9, pitch: 0.42, dist: home.dist * 0.85}));
-        await still(page, "angle-top.png", Object.assign({}, home, {pitch: 1.42, dist: home.dist * 1.05}));
-      }
-      if (want("closeups")) {
-        const otto = await where(page, "demo-lead-b");
-        await still(page, "closeup-lead.png", {yaw: home.yaw + 0.25, pitch: 0.7, dist: 12, tx: otto.x, ty: 0.6, tz: otto.z});
-        const thistle = await where(page, "demo-waiting");
-        await still(page, "closeup-waiting.png", {yaw: home.yaw + 0.2, pitch: 0.55, dist: 8, tx: thistle.x - 0.6, ty: 1, tz: thistle.z});
-        const lantern = await where(page, "demo-idle"), tally = await where(page, "demo-offline-2");
-        await still(page, "closeup-idle-offline.png", {yaw: home.yaw, pitch: 0.6, dist: 9,
-          tx: (lantern.x + tally.x) / 2, ty: 0.8, tz: (lantern.z + tally.z) / 2});
-        const rest = await where(page, "demo-lead-a/demo-a5");
-        await still(page, "closeup-resting.png", {yaw: home.yaw - 0.3, pitch: 0.6, dist: 5.5, tx: rest.x, ty: 0.3, tz: rest.z});
-        const anvil = await where(page, "demo-solo");
-        await still(page, "closeup-actions.png", {yaw: home.yaw + 0.1, pitch: 0.6, dist: 11, tx: anvil.x, ty: 0.8, tz: anvil.z});
-      }
-      if (want("panel")) {
-        const wren = await where(page, "demo-lead-a");
-        await still(page, "panel-desktop.png", {yaw: home.yaw, pitch: 0.8, dist: 18, tx: wren.x + 2, ty: 0, tz: wren.z}, 6.3,
-          "demo-lead-a");
-        await page.evaluate(() => window.__wartableSelect(null));
-      }
-      if (want("gif")) {
-        const wren = await where(page, "demo-lead-a");
-        const frames = path.join(media, ".frames");
-        fs.rmSync(frames, {recursive: true, force: true});
-        fs.mkdirSync(frames);
-        await page.setViewportSize({width: 800, height: 450});
-        await page.evaluate((c) => Object.assign(window.__strataKit.cam, c),
-          {yaw: home.yaw + 0.15, pitch: 0.72, dist: 15, tx: wren.x, ty: 0.5, tz: wren.z});
-        for (let i = 0; i < 50; i++) {
-          const t = 10 + i / 10;
-          await page.evaluate((t) => window.__strataKit.drive(t), t);
-          await page.screenshot({path: path.join(frames, String(i).padStart(3, "0") + ".png"), timeout: 600000});
-        }
-        execFileSync("python3", ["-I", "-c", [
-          "import sys, glob", "from PIL import Image",
-          "fs = sorted(glob.glob(sys.argv[1] + '/*.png'))",
-          "ims = [Image.open(f).convert('RGB').quantize(colors=160, method=Image.Quantize.MEDIANCUT) for f in fs]",
-          "ims[0].save(sys.argv[2], save_all=True, append_images=ims[1:], duration=100, loop=0, optimize=True)",
-        ].join("\n"), frames, path.join(media, "motion.gif")]);
-        fs.rmSync(frames, {recursive: true, force: true});
-        console.log("wrote motion.gif");
-      }
-      if (errors.length) { console.error("console errors:", errors); process.exitCode = 1; }
-      await ctx.close();
-    }
-    if (want("phone")) {
-      const {ctx, page, errors} = await open(browser, {width: 390, height: 844, dpr: 3, mobile: true});
-      const thistle = await where(page, "demo-waiting");
-      await still(page, "phone.png", {pitch: 0.85, dist: 15, tx: thistle.x, ty: 0, tz: thistle.z + 2.5}, 6.3, "demo-waiting");
-      if (errors.length) { console.error("console errors:", errors); process.exitCode = 1; }
-      await ctx.close();
-    }
-  } finally {
-    await browser.close();
-  }
-})().catch((e) => { console.error(e); process.exit(1); });
+async function phone(browser, server) {
+  if (!want("phone")) return;
+  const {ctx, page, errors} = await openPage(browser, server, PHONE);
+  await shoot(page, "phone",
+    "window.__shots.away('demo-waiting', 'demo-stalled', {turn: 0.5, pitch: 0.75, dist: 15, dx: -0.6}); window.__page.select('demo-waiting', false)");
+  h.assertNoErrors(errors);
+  await ctx.close();
+}
+
+// The GIF: Wren's camp for five seconds at 10 frames a second. Early on one
+// scout finishes and rides out to make camp; mid-clip Wren makes a tool call
+// and its finial flashes.
+async function motionGif(browser, server) {
+  if (!want("motion")) return;
+  const {ctx, page, errors} = await openPage(browser, server, {viewport: {width: 960, height: 540}});
+  await page.evaluate(() => {
+    const base = JSON.parse(JSON.stringify(window.__page.doc));
+    const wren = base.sessions.find((s) => s.id === "demo-lead-a");
+    window.__gif = {
+      camp() { Object.assign(wren.followers.find((f) => f.id === "demo-a1"), {state: "resting", action: "none"});
+        window.__page.feed(JSON.parse(JSON.stringify(base))); },
+      toolCall() { wren.lastToolAt += 30; window.__page.feed(JSON.parse(JSON.stringify(base))); },
+    };
+    for (let t = 6.5; t <= 10; t += 0.5) window.__page.kit.drive(t);
+    window.__shots.at("demo-lead-a", {yaw: Math.PI / 2 + 0.15, pitch: 0.72, dist: 11.5, dx: -0.3});
+  });
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "wartable-gif-"));
+  const FPS = 10;
+  await screens.frames(page, tmp, FPS * 5, (i) => {
+    const t = 10 + i / 10;
+    if (i === 3) { window.__page.kit.drive(t); window.__gif.camp(); }
+    if (i === 25) { window.__page.kit.drive(t); window.__gif.toolCall(); }
+    window.__page.kit.drive(t);
+  });
+  execFileSync("python3", [path.join(__dirname, "make_gif.py"), tmp, path.join(MEDIA, "motion.gif"), String(FPS), "800"],
+    {stdio: "inherit"});
+  fs.rmSync(tmp, {recursive: true, force: true});
+  h.assertNoErrors(errors);
+  await ctx.close();
+}
+
+h.run("screenshots", {repo: REPO, port: PORT}, async ({server, browser}) => {
+  fs.mkdirSync(MEDIA, {recursive: true});
+  await desktopStills(browser, server);
+  await phone(browser, server);
+  await motionGif(browser, server);
+});

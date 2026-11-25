@@ -1,5 +1,5 @@
 {
- "_comment": "Demo feed: two leads fanned out to 5 and 6 subagent lanes, a solo worker, a thinker, one waiting on the owner, one idle, two offline. Used by --fixture, ?fixture=1, screenshots and tests. Synthetic only: never commit a real transcript or real session data.",
+ "_comment": "Demo feed: two leads fanned out to 5 and 7 subagent lanes (one on its own branch, one stalled), a solo editor, a thinker, a reader with 2 subagents, a web searcher, an 'other' tool user, one stalled session, two waiting on the owner (a permission prompt and a question), one idle, one dim shell, three offline (one alone in its repo). Times are relative (startedAgoSec / updatedAgoSec, rebased to now) so the feed never drifts. Synthetic only: never commit real transcript or session data.",
  "sessions": [
   {
    "sessionId": "demo-lead-a",
@@ -9,8 +9,6 @@
    "cwd": "/demo/site-one",
    "branch": "main",
    "kind": "interactive",
-   "startedAt": 1795577823134.0,
-   "updatedAt": 1795581423134,
    "activity": {
     "tool": "Agent",
     "action": "delegate",
@@ -35,57 +33,65 @@
      "label": "polish/a11y",
      "state": "active",
      "tool": "Edit",
-     "toolLabel": null,
+     "toolLabel": "index.html",
      "action": "edit",
      "ageSec": 3,
      "quietSec": 3,
-     "toolCount": 20
+     "toolCount": 3,
+     "startedAgoSec": 3000
     },
     {
      "id": "demo-a2",
      "label": "polish/mobile",
      "state": "active",
      "tool": "Bash",
-     "toolLabel": null,
+     "toolLabel": "Run the mobile checks",
      "action": "run",
      "ageSec": 3,
      "quietSec": 3,
-     "toolCount": 20
+     "toolCount": 12,
+     "startedAgoSec": 2800
     },
     {
      "id": "demo-a3",
      "label": "polish/seo",
      "state": "active",
      "tool": "Read",
-     "toolLabel": null,
+     "toolLabel": "README.md",
      "action": "read",
      "ageSec": 3,
      "quietSec": 3,
-     "toolCount": 20
+     "toolCount": 20,
+     "startedAgoSec": 2600
     },
     {
      "id": "demo-a4",
      "label": "polish/perf",
      "state": "active",
      "tool": "WebFetch",
-     "toolLabel": null,
+     "toolLabel": "example.com",
      "action": "web",
      "ageSec": 8,
      "quietSec": 8,
-     "toolCount": 20
+     "toolCount": 34,
+     "startedAgoSec": 2400
     },
     {
      "id": "demo-a5",
      "label": "tests + docs",
      "state": "resting",
      "tool": "Bash",
-     "toolLabel": null,
+     "toolLabel": "Run the test suite",
      "action": "none",
      "ageSec": 3,
      "quietSec": 400,
-     "toolCount": 20
+     "toolCount": 48,
+     "startedAgoSec": 2200
     }
-   ]
+   ],
+   "startedAgoSec": 3600,
+   "updatedAgoSec": 0,
+   "toolCount": 64
   },
   {
    "sessionId": "demo-lead-b",
@@ -95,8 +101,6 @@
    "cwd": "/demo/plugin-site",
    "branch": "main",
    "kind": "interactive",
-   "startedAt": 1795578423134.0,
-   "updatedAt": 1795581423134,
    "activity": {
     "tool": "Bash",
     "action": "run",
@@ -109,22 +113,24 @@
      "label": "polish/a11y",
      "state": "active",
      "tool": "Edit",
-     "toolLabel": null,
+     "toolLabel": "index.html",
      "action": "edit",
      "ageSec": 3,
      "quietSec": 3,
-     "toolCount": 20
+     "toolCount": 61,
+     "startedAgoSec": 3000
     },
     {
      "id": "demo-b2",
      "label": "polish/mobile",
      "state": "active",
      "tool": "Edit",
-     "toolLabel": null,
+     "toolLabel": "index.html",
      "action": "edit",
      "ageSec": 1,
      "quietSec": 1,
-     "toolCount": 20
+     "toolCount": 8,
+     "startedAgoSec": 2800
     },
     {
      "id": "demo-b3",
@@ -135,29 +141,32 @@
      "action": "read",
      "ageSec": 3,
      "quietSec": 3,
-     "toolCount": 20
+     "toolCount": 90,
+     "startedAgoSec": 2600
     },
     {
      "id": "demo-b4",
      "label": "polish/performance",
      "state": "active",
      "tool": "Bash",
-     "toolLabel": null,
+     "toolLabel": "Profile page load",
      "action": "run",
      "ageSec": 3,
      "quietSec": 3,
-     "toolCount": 20
+     "toolCount": 15,
+     "startedAgoSec": 2400
     },
     {
      "id": "demo-b5",
      "label": "polish/ux-states",
      "state": "active",
      "tool": "Write",
-     "toolLabel": null,
+     "toolLabel": "styles.css",
      "action": "edit",
      "ageSec": 3,
      "quietSec": 3,
-     "toolCount": 20
+     "toolCount": 27,
+     "startedAgoSec": 2200
     },
     {
      "id": "demo-b6",
@@ -168,9 +177,27 @@
      "action": "web",
      "ageSec": 3,
      "quietSec": 3,
-     "toolCount": 20
+     "toolCount": 40,
+     "startedAgoSec": 2000,
+     "branch": "fix/endpoint-hardening"
+    },
+    {
+     "id": "demo-b7",
+     "label": "cache warm-up",
+     "state": "resting",
+     "tool": "Bash",
+     "toolLabel": "Warm the cache",
+     "action": "none",
+     "ageSec": 420,
+     "quietSec": 420,
+     "toolCount": 9,
+     "finished": false,
+     "startedAgoSec": 1500
     }
-   ]
+   ],
+   "startedAgoSec": 3000,
+   "updatedAgoSec": 0,
+   "toolCount": 88
   },
   {
    "sessionId": "demo-solo",
@@ -180,14 +207,15 @@
    "cwd": "/demo/engine",
    "branch": "feat/instancing",
    "kind": "interactive",
-   "startedAt": 1795579623134.0,
-   "updatedAt": 1795581423134,
    "activity": {
     "tool": "Edit",
     "action": "edit",
     "label": "engine.cpp",
     "ageSec": 2
-   }
+   },
+   "startedAgoSec": 1800,
+   "updatedAgoSec": 0,
+   "toolCount": 41
   },
   {
    "sessionId": "demo-thinker",
@@ -197,14 +225,15 @@
    "cwd": "/demo/engine",
    "branch": "main",
    "kind": "interactive",
-   "startedAt": 1795580523134.0,
-   "updatedAt": 1795581423134,
    "activity": {
     "tool": "Read",
     "action": "read",
     "label": "README.md",
-    "ageSec": 400
-   }
+    "ageSec": 150
+   },
+   "startedAgoSec": 900,
+   "updatedAgoSec": 5,
+   "toolCount": 12
   },
   {
    "sessionId": "demo-waiting",
@@ -214,14 +243,15 @@
    "cwd": "/demo/game",
    "branch": "release/0.4",
    "kind": "interactive",
-   "startedAt": 1795576423134.0,
-   "updatedAt": 1795581363134.0,
    "activity": {
     "tool": "Bash",
     "action": "run",
     "label": "Push the branch",
     "ageSec": 60
-   }
+   },
+   "startedAgoSec": 5000,
+   "updatedAgoSec": 60,
+   "toolCount": 30
   },
   {
    "sessionId": "demo-idle",
@@ -230,8 +260,9 @@
    "status": "idle",
    "cwd": "~",
    "kind": "interactive",
-   "startedAt": 1795574423134.0,
-   "updatedAt": 1795580823134.0
+   "startedAgoSec": 7000,
+   "updatedAgoSec": 600,
+   "toolCount": 0
   },
   {
    "sessionId": "demo-offline-1",
@@ -240,8 +271,9 @@
    "status": "offline",
    "cwd": "/demo/game",
    "kind": "remote",
-   "startedAt": 1795561423134.0,
-   "updatedAt": 1795574223134.0
+   "startedAgoSec": 20000,
+   "updatedAgoSec": 7200,
+   "toolCount": 0
   },
   {
    "sessionId": "demo-offline-2",
@@ -250,8 +282,146 @@
    "status": "offline",
    "cwd": "~",
    "kind": "remote",
-   "startedAt": 1795551423134.0,
-   "updatedAt": 1795572423134.0
+   "startedAgoSec": 30000,
+   "updatedAgoSec": 9000,
+   "toolCount": 0
+  },
+  {
+   "sessionId": "demo-stalled",
+   "pid": 0,
+   "name": "Patch",
+   "status": "busy",
+   "cwd": "/demo/game",
+   "branch": "fix/save",
+   "kind": "interactive",
+   "startedAgoSec": 2400,
+   "updatedAgoSec": 900,
+   "activity": {
+    "tool": "Bash",
+    "action": "run",
+    "label": "Run the test suite",
+    "ageSec": 900
+   },
+   "toolCount": 19
+  },
+  {
+   "sessionId": "demo-reader",
+   "pid": 0,
+   "name": "Marisol",
+   "status": "busy",
+   "cwd": "/demo/docs",
+   "branch": "main",
+   "kind": "interactive",
+   "startedAgoSec": 1200,
+   "updatedAgoSec": 0,
+   "activity": {
+    "tool": "Grep",
+    "action": "read",
+    "label": null,
+    "ageSec": 6
+   },
+   "followers": [
+    {
+     "id": "demo-r1",
+     "label": "survey the docs",
+     "state": "active",
+     "tool": "Read",
+     "toolLabel": "README.md",
+     "action": "read",
+     "ageSec": 2,
+     "quietSec": 2,
+     "toolCount": 7,
+     "startedAgoSec": 3000
+    },
+    {
+     "id": "demo-r2",
+     "label": "check the links",
+     "state": "active",
+     "tool": "WebFetch",
+     "toolLabel": "example.com",
+     "action": "web",
+     "ageSec": 4,
+     "quietSec": 4,
+     "toolCount": 55,
+     "startedAgoSec": 2800
+    }
+   ],
+   "toolCount": 23
+  },
+  {
+   "sessionId": "demo-surfer",
+   "pid": 0,
+   "name": "Otter",
+   "status": "busy",
+   "cwd": "/demo/docs",
+   "branch": "main",
+   "kind": "interactive",
+   "startedAgoSec": 600,
+   "updatedAgoSec": 0,
+   "activity": {
+    "tool": "WebSearch",
+    "action": "web",
+    "label": null,
+    "ageSec": 3
+   },
+   "toolCount": 6
+  },
+  {
+   "sessionId": "demo-other",
+   "pid": 0,
+   "name": "Sparky",
+   "status": "busy",
+   "cwd": "~",
+   "kind": "interactive",
+   "startedAgoSec": 300,
+   "updatedAgoSec": 0,
+   "activity": {
+    "tool": "TodoWrite",
+    "action": "other",
+    "label": null,
+    "ageSec": 5
+   },
+   "toolCount": 4
+  },
+  {
+   "sessionId": "demo-asker",
+   "pid": 0,
+   "name": "Juniper",
+   "status": "waiting",
+   "cwd": "/demo/site-one",
+   "branch": "main",
+   "kind": "interactive",
+   "startedAgoSec": 2200,
+   "updatedAgoSec": 30,
+   "activity": {
+    "tool": "AskUserQuestion",
+    "action": "other",
+    "label": null,
+    "ageSec": 30
+   },
+   "toolCount": 15
+  },
+  {
+   "sessionId": "demo-shell",
+   "pid": 0,
+   "name": "Pebble",
+   "status": "shell",
+   "cwd": "/demo/engine",
+   "kind": "interactive",
+   "startedAgoSec": 4000,
+   "updatedAgoSec": 1200,
+   "toolCount": 0
+  },
+  {
+   "sessionId": "demo-archived",
+   "pid": 0,
+   "name": "Fern",
+   "status": "offline",
+   "cwd": "/demo/old-site",
+   "kind": "interactive",
+   "startedAgoSec": 40000,
+   "updatedAgoSec": 12000,
+   "toolCount": 0
   }
  ]
 }
