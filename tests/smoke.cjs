@@ -1,77 +1,162 @@
-// Headless browser smoke test: serves the fixture, loads /?fixture=1, waits
-// for the kit to draw, checks the frame is not one flat colour, a banner can
-// be tapped and the panel opens, and no console errors; saves
-// docs/media/screenshot.png.
-//
-//   NODE_PATH=/root/arcade-watch/node_modules node tests/smoke.cjs [port]
-"use strict";
-const {chromium} = require("playwright");
-const {spawn} = require("child_process");
+// Headless smoke test on the demo feed (vendor/agentviz-kit/tests/harness.cjs):
+// every fixture session is a banner, every subagent a scout, every place a region;
+// the "needs you" chip cycles the waiting sessions; a tap on a waiting banner
+// opens its panel, which says why it waits; a stalled subagent is marked; a
+// subagent on its own branch shows it in the panel; a new tool call pulses;
+// feed strings never become HTML; the empty state and the unreachable banner
+// show; the frame is not flat; no console errors. Saves docs/media/screenshot.png.
+//   npm ci && npx playwright install chromium && npm run smoke
+// Every expected count and name is read from the feed document, not hardcoded.
 const path = require("path");
-const http = require("http");
+const h = require("../vendor/agentviz-kit/tests/harness.cjs");
 
-const root = path.join(__dirname, "..");
-const port = Number(process.argv[2] || 8950);
-const url = `http://127.0.0.1:${port}/?fixture=1`;
+const REPO = path.resolve(__dirname, "..");
+const PORT = Number(process.env.WARTABLE_TEST_PORT || 9134);
+const READY = "window.__page && window.__page.polls > 0 && window.__table.banners.length > 0";
 
-function waitFor(u, ms) {
-  const end = Date.now() + ms;
-  return new Promise((resolve, reject) => {
-    const tick = () => http.get(u, (r) => { r.resume(); resolve(); }).on("error", () =>
-      Date.now() > end ? reject(new Error("server did not start")) : setTimeout(tick, 200));
-    tick();
+function check(cond, message) { if (!cond) throw new Error(message); }
+
+async function checkScene(page) {
+  const info = await page.evaluate(() => {
+    const t = window.__table, doc = window.__page.doc;
+    return {banners: t.banners.length, scouts: t.scouts.length, regions: t.regions.length,
+      want: {banners: doc.sessions.length, scouts: doc.sessions.reduce((n, s) => n + s.followers.length, 0),
+        regions: new Set(doc.sessions.map((s) => s.place)).size},
+      waiting: doc.sessions.filter((s) => s.state === "waiting").map((s) => s.name),
+      primitives: window.__page.kit.stats().primitives};
   });
+  console.log("scene:", JSON.stringify(info));
+  check(info.banners === info.want.banners && info.scouts === info.want.scouts && info.regions === info.want.regions,
+    "the table does not hold every fixture session, subagent and place");
+  check(info.waiting.length === 2, "the fixture should have two sessions waiting");
+  check(info.primitives > 200, "too few primitives drawn");
+  return info;
 }
 
-(async () => {
-  const server = spawn("python3", ["-m", "vendor.agentfeed", "serve", "--web", "web", "--port", String(port), "--fixture"],
-    {cwd: root, stdio: "ignore"});
-  let browser;
-  try {
-    await waitFor(`http://127.0.0.1:${port}/api/agents`, 10000);
-    browser = await chromium.launch({args: ["--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader",
-      "--ignore-gpu-blocklist"]});
-    const page = await browser.newPage({viewport: {width: 1280, height: 720}});
-    const errors = [];
-    page.on("console", (m) => { if (m.type() === "error") errors.push(m.text()); });
-    page.on("pageerror", (e) => errors.push(String(e)));
-    await page.goto(url, {waitUntil: "commit"});
-    await page.waitForFunction(() => window.__strataKit && window.__strataKit.ready && window.__wartable &&
-      window.__wartable.doc && window.__strataKit.stats().frames > 3, null, {timeout: 120000});
-    const info = await page.evaluate(() => {
-      const w = window.__wartable;
-      return {banners: w.banners.size, scouts: w.scouts.size, stats: window.__strataKit.stats()};
-    });
-    console.log("drawn:", JSON.stringify(info));
-    if (info.banners !== 8) throw new Error("expected 8 banners, got " + info.banners);
-    if (info.scouts !== 11) throw new Error("expected 11 scouts, got " + info.scouts);
-    if (!(info.stats.primitives > 100)) throw new Error("too few primitives drawn");
-    // The frame is not one flat colour.
-    const flat = await page.evaluate(() => {
-      const c = document.getElementById("view");
-      const g = document.createElement("canvas");
-      g.width = 64; g.height = 36;
-      const x = g.getContext("2d");
-      x.drawImage(c, 0, 0, 64, 36);
-      const d = x.getImageData(0, 0, 64, 36).data;
-      let min = 255, max = 0;
-      for (let i = 0; i < d.length; i += 4) { const l = d[i] + d[i + 1] + d[i + 2]; min = Math.min(min, l); max = Math.max(max, l); }
-      return max - min < 30;
-    });
-    if (flat) throw new Error("frame is one flat colour");
-    // A tap on a banner's target selects it and opens the panel.
-    const target = await page.evaluate(() => window.__strataKit.targets()[0]);
-    if (!target) throw new Error("no tap targets");
-    const picked = await page.evaluate((t) => window.__strataKit.tapAt(t.x, t.y), target);
-    if (!picked) throw new Error("tap at a target picked nothing");
-    await page.waitForFunction(() => !document.getElementById("sheet").hidden, null, {timeout: 10000});
-    await page.evaluate(() => window.__wartableSelect(null));
-    await page.waitForTimeout(1500);
-    await page.screenshot({path: path.join(root, "docs", "media", "screenshot.png"), timeout: 180000});
-    if (errors.length) throw new Error("console errors:\n" + errors.join("\n"));
-    console.log("smoke: PASS");
-  } finally {
-    if (browser) await browser.close();
-    server.kill();
-  }
-})().catch((e) => { console.error("smoke: FAIL", e.message || e); process.exit(1); });
+const panelTitle = (page) => page.evaluate(() => {
+  const panel = document.querySelector(".av-panel");
+  return panel.hidden ? null : panel.querySelector("h2").textContent.trim();
+});
+const panelValues = (page) => page.evaluate(() => [...document.querySelectorAll(".av-panel dd")].map((d) => d.textContent));
+
+async function checkWaitingChip(page, names) {
+  const chip = page.locator(".av-wait");
+  check(await chip.isVisible(), "the needs-you chip is hidden");
+  check((await chip.locator("b").textContent()) === String(names.length), "the needs-you chip miscounts");
+  const seen = [];
+  for (let i = 0; i < names.length; i++) { await chip.click(); seen.push(await panelTitle(page)); }
+  console.log("needs-you chip cycles:", seen.join(" -> "));
+  check(seen.slice().sort().join() === names.slice().sort().join(), "the chip did not cycle both waiting sessions");
+  check(await page.locator(".av-panel .av-needs").isVisible(), "the panel does not say why it waits");
+}
+
+async function checkTapOnWaiting(page) {
+  const want = await page.evaluate(() => {
+    window.__page.select(null);
+    window.__page.fit(true);
+    window.__page.kit.drive(1);
+    const s = window.__page.doc.sessions.find((x) => x.state === "waiting" && x.waitingReason === "permission");
+    return {id: s.id, name: s.name};
+  });
+  const hit = await page.evaluate((id) => window.__strataKit.targets().find((t) => t.id === id), want.id);
+  check(hit, "no tap target for " + want.name);
+  await page.mouse.click(hit.x, hit.y);
+  await page.waitForTimeout(300);
+  const title = await panelTitle(page);
+  const reason = await page.evaluate(() => document.querySelector(".av-panel .av-needs").textContent);
+  console.log("tap on the waiting banner:", title, "/", reason);
+  check(title === want.name && reason === "needs permission", "the tap did not open the waiting panel with its reason");
+}
+
+async function checkFollowers(page) {
+  const found = await page.evaluate(() => {
+    const doc = window.__page.doc, key = (s, f) => s.id + "/" + f.id;
+    let stalled = null, branched = null;
+    for (const s of doc.sessions) for (const f of s.followers) {
+      if (f.stalled && !stalled) stalled = {id: key(s, f), label: f.label};
+      if (f.branch && f.branch !== s.branch && !branched) branched = {id: key(s, f), branch: f.branch};
+    }
+    return {stalled, branched};
+  });
+  check(found.stalled && found.branched, "the fixture should have a stalled subagent and one on its own branch");
+  await page.evaluate(() => window.__page.kit.drive(1.2));
+  const marked = await page.evaluate((label) => [...document.querySelectorAll(".av-label.scout.stalled")]
+    .some((el) => el.textContent === label), found.stalled.label);
+  check(marked, "the stalled subagent's scout label is not marked stalled");
+  await page.evaluate((id) => window.__page.select(id, false), found.stalled.id);
+  check(await page.locator(".av-panel .av-dot.av-s-stalled").count() > 0, "the stalled subagent's panel does not say so");
+  await page.evaluate((id) => window.__page.select(id, false), found.branched.id);
+  const values = await panelValues(page);
+  console.log("subagent on its own branch:", found.branched.branch);
+  check(values.includes(found.branched.branch), "the subagent panel does not show its own branch");
+}
+
+async function checkToolCallPulse(page) {
+  const pulse = await page.evaluate(() => {
+    const doc = JSON.parse(JSON.stringify(window.__page.doc));
+    const s = doc.sessions.find((x) => x.state === "busy" && x.lastToolAt != null);
+    s.lastToolAt += 5;
+    window.__page.feed(doc);
+    return window.__page.feedClient.pulse(s.id);
+  });
+  check(pulse > 0.5, "a new tool call did not pulse its banner");
+}
+
+async function checkTextOnly(page) {
+  const result = await page.evaluate(() => {
+    const doc = JSON.parse(JSON.stringify(window.__page.doc));
+    const lead = doc.sessions.find((s) => s.followers.length > 0);
+    lead.followers[0].label = "<img src=x id=pwned>";
+    window.__page.feed(doc);
+    window.__page.select(lead.id, false);
+    window.__page.kit.drive(1.4);
+    const isText = (el) => el.textContent.includes("<img src=x id=pwned>");
+    return {img: !!document.getElementById("pwned"),
+      panel: [...document.querySelectorAll(".av-panel .av-lanes button")].some(isText),
+      label: [...document.querySelectorAll(".av-label.scout")].some(isText)};
+  });
+  check(!result.img && result.panel && result.label, "a feed label was parsed as HTML");
+}
+
+async function checkEmptyState(page) {
+  const shown = await page.evaluate(() => {
+    const doc = JSON.parse(JSON.stringify(window.__page.doc));
+    const sessions = doc.sessions;
+    window.__page.feed(Object.assign(doc, {sessions: []}));
+    window.__page.kit.drive(1.5);
+    const visible = !document.querySelector(".av-empty").hidden;
+    window.__page.feed(Object.assign(doc, {sessions}));
+    return visible && document.querySelector(".av-empty").hidden;
+  });
+  check(shown, "no empty-state hint with zero sessions");
+}
+
+async function checkUnreachable(page) {
+  await page.route("**/api/agents*", (route) => route.fulfill({status: 503, body: "down"}));
+  await page.evaluate(async () => { await window.__page.pollOnce(); await window.__page.pollOnce(); });
+  const banner = await page.evaluate(() => !document.querySelector(".av-banner").hidden && document.querySelector(".av-banner").textContent);
+  console.log("banner:", banner);
+  check(banner && banner.includes("HTTP 503"), "no unreachable banner after failed polls");
+}
+
+h.run("smoke", {repo: REPO, port: PORT}, async ({server, browser}) => {
+  const {page, errors} = await h.open(browser, server.base + "/?fixture=1&drive=1&quality=1",
+    {ready: READY, viewport: {width: 1600, height: 900}});
+  await h.stillAnimations(page);
+  await page.evaluate(() => { window.__page.stopPolling(); window.__page.kit.drive(0.5); });
+  const original = await page.evaluate(() => JSON.parse(JSON.stringify(window.__page.doc)));
+  const info = await checkScene(page);
+  await checkWaitingChip(page, info.waiting);
+  await checkTapOnWaiting(page);
+  await checkFollowers(page);
+  await checkToolCallPulse(page);
+  await checkTextOnly(page);
+  await checkEmptyState(page);
+  await page.evaluate((doc) => { window.__page.feed(doc); window.__page.select(null); window.__page.fit(true); }, original);
+  await page.mouse.move(2, 400);  // no hover ring in the saved frame
+  const png = await require("../vendor/agentviz-kit/tests/screens.cjs").still(page,
+    path.join(REPO, "docs/media/screenshot.png"), () => window.__page.kit.drive(4));
+  console.log("distinct colours:", await h.assertNotFlat(page, png));
+  h.assertNoErrors(errors);
+  await checkUnreachable(page);  // last: the failed fetches log console errors of their own
+});

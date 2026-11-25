@@ -6,10 +6,14 @@ on:
 jobs:
   unittest:
     runs-on: ubuntu-24.04
+    strategy:
+      matrix:
+        python-version: ["3.8", "3.12"]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
-      - name: Unit tests (serve the fixture, page + assets + feed)
-        run: python3 -m unittest discover -s tests -v
+          python-version: ${{ matrix.python-version }}
+      # The scene build (emsdk) is committed, so CI serves the fixture, checks
+      # the page, its assets and the feed, and that vendor/ matches its PINs.
+      - run: python3 -m unittest discover -s tests -v
