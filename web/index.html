@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>War Table</title>
+<style>
+  :root { color-scheme: dark; --bg: #0b0704; --ink: #2a1a0c; --parch: #e9d6ac; --parch2: #d9c08e;
+    --panel: rgba(233, 214, 172, 0.96); --fg: #2a1a0c; --ember: #ff8a2a; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: var(--bg); color: var(--fg);
+    font: 14px/1.4 Georgia, "Iowan Old Style", "Palatino Linotype", serif; }
+  #view { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; outline: none; }
+  #labels { position: fixed; inset: 0; pointer-events: none; overflow: hidden; }
+  .lbl { position: absolute; transform: translate(-50%, -100%); white-space: nowrap; }
+  .lbl.banner { font-size: 13px; font-weight: bold; padding: 1px 8px 1px 6px; border-radius: 3px;
+    background: var(--parch); color: var(--ink); border-left: 5px solid var(--field, #833);
+    box-shadow: 0 1px 4px rgba(0,0,0,.6); }
+  .lbl.banner[data-state="offline"] { opacity: .55; filter: grayscale(1); }
+  .lbl.banner[data-state="waiting"] { background: #ffd27a; animation: glow 1s ease-in-out infinite alternate; }
+  .lbl.banner[data-state="waiting"]::before { content: "🔥 "; }
+  @keyframes glow { from { box-shadow: 0 0 4px 1px var(--ember); } to { box-shadow: 0 0 14px 5px var(--ember); } }
+  .lbl.region { font-style: italic; font-size: 15px; color: #f3e2b8; letter-spacing: .06em;
+    text-shadow: 0 1px 3px #000, 0 0 6px #000; font-variant: small-caps; }
+  .lbl.region.alarm { color: #ffc27a; }
+  .lbl.scout { font-size: 11px; color: #f3e2b8; text-shadow: 0 1px 2px #000, 0 0 4px #000; }
+
+  #hud { position: fixed; top: max(10px, env(safe-area-inset-top)); left: max(10px, env(safe-area-inset-left));
+    right: max(10px, env(safe-area-inset-right)); display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
+    pointer-events: none; }
+  #hud > * { pointer-events: auto; }
+  .pill { background: var(--panel); color: var(--ink); border-radius: 4px; padding: 4px 10px; font-size: 13px;
+    box-shadow: 0 2px 6px rgba(0,0,0,.5); border: 1px solid #7a5a2c; }
+  .pill h1 { font-size: 15px; margin: 0; display: inline; font-variant: small-caps; letter-spacing: .05em; }
+  #beacons { background: #ffb347; border-color: #a33; font-weight: bold; cursor: pointer;
+    animation: glow 0.9s ease-in-out infinite alternate; font: inherit; font-weight: bold; }
+  #legend-btn { cursor: pointer; font: inherit; margin-left: auto; }
+  #fixture-tag { background: #444; color: #eee; border-color: #222; }
+  body.feed-down #hud .pill:first-child::after { content: " · feed lost"; color: #a22; }
+
+  #legend { position: fixed; top: 52px; right: max(10px, env(safe-area-inset-right)); width: min(340px, calc(100vw - 20px));
+    max-height: calc(100vh - 70px); overflow: auto; background: var(--panel); border: 1px solid #7a5a2c;
+    border-radius: 6px; padding: 10px 12px; box-shadow: 0 4px 16px rgba(0,0,0,.6); font-size: 13px; }
+  #legend h3 { margin: 6px 0 4px; font-variant: small-caps; font-size: 14px; }
+  #legend ul { list-style: none; margin: 0; padding: 0; }
+  #legend li { margin: 2px 0; }
+
+  #sheet { position: fixed; right: 14px; bottom: 14px; width: 330px; max-height: 70vh; overflow: auto;
+    background: var(--panel); border: 1px solid #7a5a2c; border-radius: 6px; padding: 12px 14px;
+    box-shadow: 0 6px 24px rgba(0,0,0,.7); }
+  #sheet .head { display: flex; gap: 10px; align-items: flex-start; }
+  #sheet h2 { margin: 0; font-size: 18px; }
+  #sheet .sub { font-size: 12px; opacity: .8; }
+  #sheet code { font-size: 11px; background: rgba(0,0,0,.08); padding: 0 4px; border-radius: 3px; }
+  #sheet .close { margin-left: auto; background: none; border: none; font-size: 22px; line-height: 1; cursor: pointer;
+    color: var(--ink); padding: 0 4px; }
+  .flag { width: 22px; height: 30px; background: var(--field); flex: none; margin-top: 2px;
+    clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 78%, 0 100%); }
+  .flag.small { width: 16px; height: 22px; }
+  .row { margin-top: 8px; display: flex; gap: 6px; flex-wrap: wrap; }
+  .state { background: rgba(0,0,0,.08); border-radius: 3px; padding: 2px 8px; font-weight: bold; }
+  .state[data-state="waiting"] { background: #ffb347; }
+  .state[data-state="stalled"] { background: #aaa; }
+  .chip { display: inline-flex; align-items: center; gap: 6px; background: rgba(0,0,0,.08); border-radius: 3px; padding: 2px 8px; }
+  .chip i { width: 12px; height: 12px; border-radius: 2px; background: var(--c); border: 1px solid #5a4020; }
+  .chip small, .scouts small { opacity: .7; margin-left: 4px; }
+  .kv { margin-top: 6px; font-size: 13px; }
+  .kv span { display: inline-block; min-width: 92px; opacity: .7; }
+  .scouts { list-style: none; margin: 8px 0 0; padding: 0; border-top: 1px solid rgba(0,0,0,.15); }
+  .scouts li { padding: 5px 2px; border-bottom: 1px solid rgba(0,0,0,.1); cursor: pointer; }
+  .scouts li:hover { background: rgba(0,0,0,.06); }
+  .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: var(--c); border: 1px solid #5a4020;
+    margin-right: 4px; vertical-align: -1px; }
+  a { color: #6b1d10; }
+
+  @media (max-width: 640px) {
+    #sheet { left: 0; right: 0; bottom: 0; width: auto; max-height: 52vh; border-radius: 14px 14px 0 0;
+      padding: 8px 16px calc(14px + env(safe-area-inset-bottom)); }
+    #sheet::before { content: ""; display: block; width: 40px; height: 4px; border-radius: 2px; background: rgba(0,0,0,.3);
+      margin: 0 auto 8px; }
+    .pill { font-size: 12px; padding: 3px 8px; }
+    .lbl.region { font-size: 13px; }
+  }
+</style>
+</head>
+<body>
+<canvas id="view" tabindex="0" role="img" aria-label="A campaign war table: each session is a banner on the map, each subagent a mounted scout"></canvas>
+<div id="labels" aria-hidden="true"></div>
+<div id="hud">
+  <div class="pill"><h1>⚔ War Table</h1></div>
+  <div class="pill" title="Banners raised (sessions not offline)">⚑ <span id="count-banners">0</span></div>
+  <div class="pill" title="Scouts riding (active subagents)">🐎 <span id="count-scouts">0</span></div>
+  <button id="beacons" class="pill" hidden title="Sessions waiting on you">🔥 <b>0</b> beacon lit: needs you</button>
+  <span id="fixture-tag" class="pill" hidden>demo feed</span>
+  <button id="legend-btn" class="pill" aria-label="Legend">?</button>
+</div>
+<aside id="legend" hidden>
+  <h3>Sessions are banners</h3>
+  <ul>
+    <li>⚑ Waving banner: busy on campaign</li>
+    <li>🔥 Beacon fire on a hill: <b>waiting on you</b></li>
+    <li>🕯 Banner still, low candle: idle</li>
+    <li>⚐ Lowered grey banner: offline</li>
+    <li>💨 Smoke: stalled (busy, silent 5 min)</li>
+  </ul>
+  <h3>What a banner is doing</h3>
+  <ul>
+    <li><span class="dot" style="--c:#f7a540"></span>Anvil and sparks: editing</li>
+    <li><span class="dot" style="--c:#c0352f"></span>Catapult: running commands</li>
+    <li><span class="dot" style="--c:#f3eedb"></span>Scroll on a lectern: reading</li>
+    <li><span class="dot" style="--c:#222"></span>Raven to the map edge: web</li>
+    <li><span class="dot" style="--c:#f6d15e"></span>Horn and gold ripples: delegating</li>
+    <li><span class="dot" style="--c:#93b9f6"></span>Furled banner, pale motes: thinking</li>
+    <li><span class="dot" style="--c:#b98ad9"></span>War drum: another tool</li>
+  </ul>
+  <h3>Subagents are scouts</h3>
+  <ul>
+    <li>🐎 Riding the dotted path: active (pennant = action colour)</li>
+    <li>⛺ Tent and campfire at the cross: resting</li>
+    <li>Rider's cloak and saddle cloth = their lead's banner colour</li>
+  </ul>
+  <h3>Places are regions</h3>
+  <ul><li>Each repo is a region on the map; its border glows when a banner there needs you.</li></ul>
+</aside>
+<section id="sheet" hidden aria-live="polite"></section>
+<script src="strata-loader.js"></script>
+<script src="strata-kit.js"></script>
+<script src="wartable.js"></script>
+</body>
+</html>
