@@ -1,5 +1,6 @@
 """The pure core: registry records and activity in, the feed document out.
 No file, process or network access happens here; see ports/ and adapters/."""
+import math
 from typing import List, Optional
 
 from .labels import place_of, seed_of, short_label
@@ -75,8 +76,16 @@ def _text_or_none(value) -> Optional[str]:
 
 
 def _epoch_ms_or_zero(value):
-    """A registry timestamp as a number; anything else (a corrupt file) as 0."""
-    return value if isinstance(value, (int, float)) and not isinstance(value, bool) else 0
+    """A registry timestamp as a finite number; anything else (a corrupt file,
+    NaN, Infinity, which JSON can't carry) as 0."""
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return 0
+    return value if math.isfinite(value) else 0
+
+
+def _short_text_or_none(value, limit=32):
+    text = _text_or_none(value)
+    return short_label(text, limit) if text is not None else None
 
 
 def session_entry(record: SessionRecord, activity: Optional[Activity], now) -> dict:
@@ -84,9 +93,9 @@ def session_entry(record: SessionRecord, activity: Optional[Activity], now) -> d
     or hand-edited file) are treated as missing rather than failing the feed."""
     raw = record.raw
     activity = activity or Activity()
-    session_id = str(raw.get("sessionId") or raw.get("pid") or "?")
+    session_id = short_label(str(raw.get("sessionId") or raw.get("pid") or "?"), 80)
     place, place_label = place_of(raw.get("cwd") if isinstance(raw.get("cwd"), str) else "")
-    status = _text_or_none(raw.get("status"))
+    status = _short_text_or_none(raw.get("status"))
     state = state_of(status, record.alive)
     current = activity.current
     tool_age = (current or {}).get("ageSec")
@@ -105,7 +114,7 @@ def session_entry(record: SessionRecord, activity: Optional[Activity], now) -> d
         "place": place,
         "placeLabel": place_label,
         "branch": activity.branch,
-        "kind": _text_or_none(raw.get("kind")),
+        "kind": _short_text_or_none(raw.get("kind")),
         "fixture": bool(raw.get("_fixture")),
         "activity": current,
         "action": current_action(state, (current or {}).get("tool"), tool_age, active_followers),

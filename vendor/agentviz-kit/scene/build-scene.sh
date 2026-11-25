@@ -25,7 +25,8 @@ if [ ! -f "$tarball" ]; then
   curl -fsSL -o "$tarball.part" "$url"
   mv "$tarball.part" "$tarball"
 fi
-if ! echo "$STRATA_SHA256  $tarball" | sha256sum -c --quiet -; then
+sha256_of() { if command -v sha256sum >/dev/null 2>&1; then sha256sum "$1"; else shasum -a 256 "$1"; fi | cut -d' ' -f1; }
+if [ "$(sha256_of "$tarball")" != "$STRATA_SHA256" ]; then
   echo "build-scene: $tarball does not match the pinned SHA-256; delete it and retry" >&2
   exit 1
 fi

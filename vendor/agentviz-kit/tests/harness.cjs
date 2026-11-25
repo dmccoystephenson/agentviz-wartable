@@ -41,9 +41,11 @@ function status(url) {
   });
 }
 
-// Starts `python3 -m vendor.agentfeed serve --fixture` and waits for the feed.
+// Starts `python3 -m vendor.agentfeed serve --fixture` (AGENTVIZ_PYTHON overrides) and waits for the feed.
 // stop() kills exactly that process, by its pid.
-async function serveFixture({repo = process.cwd(), port, web = "web", python = "python3"}) {
+const DEFAULT_PYTHON = process.env.AGENTVIZ_PYTHON || (process.platform === "win32" ? "python" : "python3");
+
+async function serveFixture({repo = process.cwd(), port, web = "web", python = DEFAULT_PYTHON}) {
   if (!port) throw new Error("serveFixture: pass the test port");
   const child = spawn(python, ["-m", "vendor.agentfeed", "serve", "--web", web, "--port", String(port), "--fixture"],
     {cwd: repo, stdio: ["ignore", "ignore", "inherit"]});

@@ -136,6 +136,11 @@ struct Frame {
         if (data[0] != kMagic) return fail("not an agentviz wire buffer");
         if (toInt(data[1]) != kFormatVersion) return fail("wire format version mismatch");
         const size_t nZones = toId(data[2]), nAgents = toId(data[3]), nLinks = toId(data[4]);
+        // Bound each count by what the buffer could hold before multiplying:
+        // on wasm32 size_t is 32 bits, so a huge claimed count would wrap.
+        const size_t room = count - static_cast<size_t>(kHeader);
+        if (nZones > room / kZoneStride || nAgents > room / kAgentStride || nLinks > room / kLinkStride)
+            return fail("record counts do not match the buffer length");
         const size_t want = kHeader + nZones * kZoneStride + nAgents * kAgentStride + nLinks * kLinkStride;
         if (want != count) return fail("record counts do not match the buffer length");
         waitingCount = toInt(data[5]);

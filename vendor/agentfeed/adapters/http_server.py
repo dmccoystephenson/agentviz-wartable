@@ -74,7 +74,9 @@ def make_handler(web_dir, fixture_mode, fixture_path=FIXTURE_FILE):
         def _send_feed(self, query):
             use_fixture = fixture_mode or parse_qs(query).get("fixture", ["0"])[0] == "1"
             document = _build_feed(load_fixture(fixture_path) if use_fixture else None)
-            self._send(200, "application/json", json.dumps(document).encode())
+            # allow_nan=False: a NaN or Infinity that slipped past the core
+            # would make invalid JSON and break every page; fail loudly here.
+            self._send(200, "application/json", json.dumps(document, allow_nan=False).encode())
 
         def _send(self, code, content_type, body):
             self.send_response(code)
