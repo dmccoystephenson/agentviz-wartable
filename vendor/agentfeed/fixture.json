@@ -1,0 +1,257 @@
+{
+ "_comment": "Demo feed: two leads fanned out to 5 and 6 subagent lanes, a solo worker, a thinker, one waiting on the owner, one idle, two offline. Used by --fixture, ?fixture=1, screenshots and tests. Synthetic only: never commit a real transcript or real session data.",
+ "sessions": [
+  {
+   "sessionId": "demo-lead-a",
+   "pid": 0,
+   "name": "Wren",
+   "status": "busy",
+   "cwd": "/demo/site-one",
+   "branch": "main",
+   "kind": "interactive",
+   "startedAt": 1795577823134.0,
+   "updatedAt": 1795581423134,
+   "activity": {
+    "tool": "Agent",
+    "action": "delegate",
+    "label": "polish lanes",
+    "ageSec": 200
+   },
+   "recent": [
+    {
+     "tool": "Read",
+     "action": "read",
+     "ageSec": 300
+    },
+    {
+     "tool": "Agent",
+     "action": "delegate",
+     "ageSec": 200
+    }
+   ],
+   "followers": [
+    {
+     "id": "demo-a1",
+     "label": "polish/a11y",
+     "state": "active",
+     "tool": "Edit",
+     "toolLabel": null,
+     "action": "edit",
+     "ageSec": 3,
+     "quietSec": 3,
+     "toolCount": 20
+    },
+    {
+     "id": "demo-a2",
+     "label": "polish/mobile",
+     "state": "active",
+     "tool": "Bash",
+     "toolLabel": null,
+     "action": "run",
+     "ageSec": 3,
+     "quietSec": 3,
+     "toolCount": 20
+    },
+    {
+     "id": "demo-a3",
+     "label": "polish/seo",
+     "state": "active",
+     "tool": "Read",
+     "toolLabel": null,
+     "action": "read",
+     "ageSec": 3,
+     "quietSec": 3,
+     "toolCount": 20
+    },
+    {
+     "id": "demo-a4",
+     "label": "polish/perf",
+     "state": "active",
+     "tool": "WebFetch",
+     "toolLabel": null,
+     "action": "web",
+     "ageSec": 8,
+     "quietSec": 8,
+     "toolCount": 20
+    },
+    {
+     "id": "demo-a5",
+     "label": "tests + docs",
+     "state": "resting",
+     "tool": "Bash",
+     "toolLabel": null,
+     "action": "none",
+     "ageSec": 3,
+     "quietSec": 400,
+     "toolCount": 20
+    }
+   ]
+  },
+  {
+   "sessionId": "demo-lead-b",
+   "pid": 0,
+   "name": "Otto",
+   "status": "busy",
+   "cwd": "/demo/plugin-site",
+   "branch": "main",
+   "kind": "interactive",
+   "startedAt": 1795578423134.0,
+   "updatedAt": 1795581423134,
+   "activity": {
+    "tool": "Bash",
+    "action": "run",
+    "label": "Check lane PRs",
+    "ageSec": 4
+   },
+   "followers": [
+    {
+     "id": "demo-b1",
+     "label": "polish/a11y",
+     "state": "active",
+     "tool": "Edit",
+     "toolLabel": null,
+     "action": "edit",
+     "ageSec": 3,
+     "quietSec": 3,
+     "toolCount": 20
+    },
+    {
+     "id": "demo-b2",
+     "label": "polish/mobile",
+     "state": "active",
+     "tool": "Edit",
+     "toolLabel": null,
+     "action": "edit",
+     "ageSec": 1,
+     "quietSec": 1,
+     "toolCount": 20
+    },
+    {
+     "id": "demo-b3",
+     "label": "polish/seo-metadata",
+     "state": "active",
+     "tool": "Grep",
+     "toolLabel": null,
+     "action": "read",
+     "ageSec": 3,
+     "quietSec": 3,
+     "toolCount": 20
+    },
+    {
+     "id": "demo-b4",
+     "label": "polish/performance",
+     "state": "active",
+     "tool": "Bash",
+     "toolLabel": null,
+     "action": "run",
+     "ageSec": 3,
+     "quietSec": 3,
+     "toolCount": 20
+    },
+    {
+     "id": "demo-b5",
+     "label": "polish/ux-states",
+     "state": "active",
+     "tool": "Write",
+     "toolLabel": null,
+     "action": "edit",
+     "ageSec": 3,
+     "quietSec": 3,
+     "toolCount": 20
+    },
+    {
+     "id": "demo-b6",
+     "label": "fix/endpoint-hardening",
+     "state": "active",
+     "tool": "WebSearch",
+     "toolLabel": null,
+     "action": "web",
+     "ageSec": 3,
+     "quietSec": 3,
+     "toolCount": 20
+    }
+   ]
+  },
+  {
+   "sessionId": "demo-solo",
+   "pid": 0,
+   "name": "Anvil",
+   "status": "busy",
+   "cwd": "/demo/engine",
+   "branch": "feat/instancing",
+   "kind": "interactive",
+   "startedAt": 1795579623134.0,
+   "updatedAt": 1795581423134,
+   "activity": {
+    "tool": "Edit",
+    "action": "edit",
+    "label": "engine.cpp",
+    "ageSec": 2
+   }
+  },
+  {
+   "sessionId": "demo-thinker",
+   "pid": 0,
+   "name": "Scout",
+   "status": "busy",
+   "cwd": "/demo/engine",
+   "branch": "main",
+   "kind": "interactive",
+   "startedAt": 1795580523134.0,
+   "updatedAt": 1795581423134,
+   "activity": {
+    "tool": "Read",
+    "action": "read",
+    "label": "README.md",
+    "ageSec": 400
+   }
+  },
+  {
+   "sessionId": "demo-waiting",
+   "pid": 0,
+   "name": "Thistle",
+   "status": "waiting",
+   "cwd": "/demo/game",
+   "branch": "release/0.4",
+   "kind": "interactive",
+   "startedAt": 1795576423134.0,
+   "updatedAt": 1795581363134.0,
+   "activity": {
+    "tool": "Bash",
+    "action": "run",
+    "label": "Push the branch",
+    "ageSec": 60
+   }
+  },
+  {
+   "sessionId": "demo-idle",
+   "pid": 0,
+   "name": "Lantern",
+   "status": "idle",
+   "cwd": "~",
+   "kind": "interactive",
+   "startedAt": 1795574423134.0,
+   "updatedAt": 1795580823134.0
+  },
+  {
+   "sessionId": "demo-offline-1",
+   "pid": 0,
+   "name": "Delta",
+   "status": "offline",
+   "cwd": "/demo/game",
+   "kind": "remote",
+   "startedAt": 1795561423134.0,
+   "updatedAt": 1795574223134.0
+  },
+  {
+   "sessionId": "demo-offline-2",
+   "pid": 0,
+   "name": "Tally",
+   "status": "offline",
+   "cwd": "~",
+   "kind": "remote",
+   "startedAt": 1795551423134.0,
+   "updatedAt": 1795572423134.0
+  }
+ ]
+}
