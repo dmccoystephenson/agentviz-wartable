@@ -23,5 +23,3 @@ https://github.com/dmccoystephenson/agentviz
 - Page scripts never use `innerHTML` or empty `catch` blocks, and tracked files hold no machine
   paths: `tests/test_serve.py` checks both.
 - Screenshots come from the FIXTURE feed only, never live sessions.
-- While the repo is private, hosted Actions are billing-blocked: run localci on PRs
-  (drop this line once it is public).
