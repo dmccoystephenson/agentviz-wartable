@@ -18,23 +18,9 @@
   let sceneTime = 0, lastT = 0;
 
   /* ------------------------------------------------------------ camera */
-  // The camera the engine builds (Strata kit sk_frame: an orbit about the
-  // target, 50 degree vertical field of view), here so a view can be fitted
-  // before it is drawn. Keep in step with strata_kit.h if the kit changes.
-  const FOV_TAN = Math.tan(25 * Math.PI / 180);
-  function projectWith(c, x, y, z, W, H) {
-    const cp = Math.cos(c.pitch);
-    const ex = c.tx + c.dist * cp * Math.cos(c.yaw), ey = c.ty + c.dist * Math.sin(c.pitch), ez = c.tz + c.dist * cp * Math.sin(c.yaw);
-    let fx = c.tx - ex, fy = c.ty - ey, fz = c.tz - ez;
-    const fl = Math.hypot(fx, fy, fz); fx /= fl; fy /= fl; fz /= fl;
-    const rl = Math.hypot(fz, fx), rx = -fz / rl, rz = fx / rl;            // forward x up
-    const ux = -rz * fy, uy = rz * fx - rx * fz, uz = rx * fy;             // right x forward
-    const px = x - ex, py = y - ey, pz = z - ez;
-    const depth = px * fx + py * fy + pz * fz;
-    if (depth <= 0.01) return null;
-    const sx = (px * rx + pz * rz) / (depth * FOV_TAN * (W / H)), sy = (px * ux + py * uy + pz * uz) / (depth * FOV_TAN);
-    return {x: (sx * 0.5 + 0.5) * W, y: (0.5 - sy * 0.5) * H};
-  }
+  // The engine's camera maths (Strata kit sk_frame) comes from the agentviz
+  // kit, so a view can be fitted before it is drawn.
+  const {projectWith, fitPoints, sameView} = AgentvizScreen;
 
   // The part of the canvas nothing covers: below the top bar and, with
   // `panel`, above the bottom sheet (phone) or right of the card (desktop).
@@ -50,46 +36,18 @@
     return r;
   }
 
-  // Moves the camera target so world point (x, y, z) lands on screen (sx, sy):
-  // a few Newton steps on the ground-plane Jacobian.
-  function aim(c, x, y, z, sx, sy, W, H) {
-    for (let i = 0; i < 6; i++) {
-      const q = projectWith(c, x, y, z, W, H);
-      const qx = projectWith(Object.assign({}, c, {tx: c.tx + 1}), x, y, z, W, H);
-      const qz = projectWith(Object.assign({}, c, {tz: c.tz + 1}), x, y, z, W, H);
-      if (!q || !qx || !qz) return c;
-      const a = qx.x - q.x, b = qz.x - q.x, d = qx.y - q.y, e = qz.y - q.y, det = a * e - b * d;
-      if (Math.abs(det) < 1e-6) return c;
-      const dx = sx - q.x, dy = sy - q.y;
-      c.tx += (e * dx - b * dy) / det;
-      c.tz += (a * dy - d * dx) / det;
-    }
-    return c;
-  }
-
   const isTall = () => canvas.clientWidth / Math.max(1, canvas.clientHeight) < 0.8;
 
   // The whole parchment, banners standing on its far edge included, as large
   // as it fits below the top bar. Portrait screens look down more steeply.
   function fitView() {
-    const m = table.bounds(), fr = freeRect(false), W = fr.W, H = fr.H;
+    const m = table.bounds(), fr = freeRect(false);
     const pts = [];
     for (const x of [m[0], m[2]]) for (const z of [m[1], m[3]]) pts.push([x, 0, z]);
     for (const x of [m[0], m[2]]) pts.push([x, 3.2, m[1] + 2]);
     const c = {yaw: DEFAULT_YAW, pitch: isTall() ? PORTRAIT_PITCH : DEFAULT_PITCH, dist: 40, ty: 0,
       tx: (m[0] + m[2]) / 2, tz: (m[1] + m[3]) / 2};
-    const mid = [c.tx, 0, c.tz];
-    for (let i = 0; i < 40; i++) {
-      const qs = pts.map((p) => projectWith(c, p[0], p[1], p[2], W, H));
-      if (qs.some((q) => !q)) { c.dist *= 1.3; continue; }
-      const bx0 = Math.min(...qs.map((q) => q.x)), bx1 = Math.max(...qs.map((q) => q.x));
-      const by0 = Math.min(...qs.map((q) => q.y)), by1 = Math.max(...qs.map((q) => q.y));
-      const k = Math.max((bx1 - bx0) / (fr.x1 - fr.x0), (by1 - by0) / (fr.y1 - fr.y0));
-      c.dist = Math.min(150, Math.max(12, c.dist * Math.pow(k, 0.7)));
-      const q = projectWith(c, mid[0], mid[1], mid[2], W, H);
-      if (q) aim(c, mid[0], mid[1], mid[2], q.x + (fr.x0 + fr.x1) / 2 - (bx0 + bx1) / 2, q.y + (fr.y0 + fr.y1) / 2 - (by0 + by1) / 2, W, H);
-    }
-    return c;
+    return fitPoints(c, pts, fr, {minDist: 12, maxDist: 150});
   }
   let lastFit = null;
   function fit(instant) {
@@ -104,8 +62,7 @@
     const relaid = table.setTall(isTall());
     const c = kit && kit.cam;
     if (!c || !lastFit) return;
-    const untouched = ["yaw", "pitch", "dist", "tx", "tz"].every((k) => Math.abs(c[k] - lastFit[k]) < 1e-3);
-    if (relaid || (untouched && !camAnim)) fit(!relaid);
+    if (relaid || (sameView(c, lastFit) && !camAnim)) fit(!relaid);
   }
   function flyTo(to, instant) {
     if (instant || kit.driven) { Object.assign(kit.cam, to); camAnim = null; return; }
@@ -123,13 +80,13 @@
   // A waiting banner is framed with its beacon hill (drawn to its west).
   function reveal(o, zoom) {
     const beacon = o.session && !o.follower && o.session.state === "waiting" ? -0.6 : 0;
-    const x = o.x + beacon, y = o.follower ? 0.6 : o.top * 0.5, z = o.z;
+    const p = [o.x + beacon, o.follower ? 0.6 : o.top * 0.5, o.z];
     const fr = freeRect(true), base = camAnim ? camAnim.to : kit.cam;
-    const c = Object.assign({}, base, zoom ? {dist: Math.min(base.dist, 16), ty: 0.6} : {});
-    const q = projectWith(c, x, y, z, fr.W, fr.H), pad = 36;
     // Its foot (horse, cairn, beacon hill) hangs below the anchor, so the bottom edge keeps a wider margin.
-    if (!zoom && q && q.x > fr.x0 + pad && q.x < fr.x1 - pad && q.y > fr.y0 + pad * 2 && q.y < fr.y1 - pad * 2) return;
-    flyTo(aim(c, x, y, z, (fr.x0 + fr.x1) / 2, (fr.y0 + fr.y1) / 2 + 16, fr.W, fr.H));
+    const pad = {top: 72, right: 36, bottom: 72, left: 36};
+    const to = AgentvizScreen.reveal(base, p, fr,
+      zoom ? {set: {dist: Math.min(base.dist, 16), ty: 0.6}, force: true, pad, dy: 16} : {pad, dy: 16});
+    if (to) flyTo(to);
   }
 
   /* ------------------------------------------------------------ labels */
@@ -172,24 +129,10 @@
     for (const b of table.banners) bannerLabel(b, items);
     for (const sc of table.scouts) scoutLabel(sc, items);
     labels.end();
-    StrataKit.placeLabels(keepClear(items));
+    // On screen and clear of the bar, panel and legend; a label that must
+    // show (waiting, selected) drops below the bar instead of hiding.
+    hud.placeLabels(items, {canvas});
   }
-  // Labels stay on screen and out from under the top bar: one that would sit
-  // under it hides, unless it must show (waiting, selected), then it drops
-  // just below the bar.
-  function keepClear(items) {
-    const fr = freeRect(false), top = fr.y0 - 4;
-    for (const it of items) {
-      if (!it.q || it.el._skW == null) continue;
-      const half = it.el._skW / 2 + 4, h = it.el._skH || 18;
-      it.q = {x: Math.min(Math.max(it.q.x, half), Math.max(half, fr.W - half)), y: it.q.y, w: it.q.w};
-      if (it.q.y - h < top) {
-        if (it.rank <= 0) { it.q = {x: it.q.x, y: top + h, w: it.q.w}; it.tries = 1; } else it.q = null;
-      }
-    }
-    return items;
-  }
-
   /* ------------------------------------------------------------ picking + selection */
   // Points up the pole, on the flag and at the beacon, so any part of a banner taps.
   function pickPoints(o) {
@@ -217,6 +160,7 @@
 
   const hud = AgentvizHud.create({
     title: "War Table",
+    oneRow: true,
     legend: document.getElementById("legend"),
     buttons: [{icon: "home", label: "Recentre the view", onClick: () => fit(false)}],
     onSelect,
