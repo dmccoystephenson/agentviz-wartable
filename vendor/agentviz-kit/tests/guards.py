@@ -19,6 +19,9 @@ EMPTY_CATCH = re.compile(r"catch\s*(\([^)]*\))?\s*\{\s*\}")
 MACHINE_PATHS = ("/" + "root/", "/" + "home/", "C:" + "\\\\Users\\\\")  # split so this file doesn't match itself
 BINARY = (".wasm", ".png", ".gif", ".jpg", ".jpeg", ".webp", ".mp4", ".f32", "package-lock.json")
 ALLOWED_PATH_FILES = ("CLAUDE.md",)  # the "while private" localci line, removed on flip day
+# Paths in Emscripten's virtual filesystem, written into every built engine;
+# they name no real machine.
+EMSCRIPTEN_VIRTUAL_PATHS = ("/" + "home/web_user", "/" + "tmp/filedrop")
 
 
 def own_page_files(repo):
@@ -66,5 +69,8 @@ class GuardTests(unittest.TestCase):
             if os.path.basename(name) in ALLOWED_PATH_FILES:
                 continue
             text = _read(path)
+            if "-engine." in os.path.basename(name):
+                for virtual in EMSCRIPTEN_VIRTUAL_PATHS:
+                    text = text.replace(virtual, "")
             for marker in MACHINE_PATHS:
                 self.assertNotIn(marker, text, "%s contains %s" % (name, marker))

@@ -13,19 +13,40 @@
        buttons: [{icon: "home", label: "Recentre", onClick() {}}],
        onSelect(target, how) {},   // target {session, follower|null} or null; how: "tap" | "list" | "waiting"
        rows(target) { return [["desk", "3"]]; },       // optional extra panel rows
+       oneRow: true,               // optional: the bar keeps to one row on a phone
      });
      hud.update(doc); hud.setStatus(status, info); hud.select(target);
 
-   Classic script: window.AgentvizHud. Needs AgentvizScreen and AgentvizFeed. MIT. */
-(function () {
+   Every count chip carries av-count av-count-<key> (busy, followers, idle,
+   offline), the page's buttons av-btn, so a page styles a chip by class.
+   With oneRow the counts and the demo badge sit in .av-bar-scroll, which on
+   a phone scrolls sideways under the buttons.
+
+   Phone helpers (all in canvas pixels; canvas defaults to the window):
+     hud.panelRect()               the panel's resting rect, or null when closed
+     hud.clearArea(canvas)         {W, H, top, avoid} for AgentvizScreen.keepClear
+     hud.freeRect(canvas, {panel}) the uncovered area, for AgentvizScreen.reveal
+     hud.placeLabels(items, {canvas, strataAvoid, place})
+                                   keepClear, then StrataKit.placeLabels
+
+   Classic script (window.AgentvizHud) that also loads under Node for the
+   unit tests (create needs a DOM). Needs AgentvizScreen and AgentvizFeed. MIT. */
+(function (root, factory) {
+  if (typeof module === "object" && module.exports) {
+    module.exports = factory(require("./agentviz-screen.js"), require("./agentviz-feed.js"));
+  } else root.AgentvizHud = factory(root.AgentvizScreen, root.AgentvizFeed);
+})(typeof self !== "undefined" ? self : this, function (Screen, Feed) {
   "use strict";
-  const {icon, dot, text} = window.AgentvizScreen;
-  const {signature} = window.AgentvizFeed;
+  const {icon, dot, text} = Screen;
+  const {signature} = Feed;
   const REASON = {question: "has a question", permission: "needs permission"};
   const COUNTS = [["busy", "busy", (ss) => ss.filter((s) => s.state === "busy").length],
     ["followers", "subagents", (ss) => ss.reduce((n, s) => n + (s.followers || []).filter((f) => f.state === "active").length, 0)],
     ["idle", "idle", (ss) => ss.filter((s) => s.state === "idle" || s.state === "dim").length],
     ["offline", "away", (ss) => ss.filter((s) => s.state === "offline").length]];
+  // The class of the count chip for COUNTS key `key`: style or hide it by
+  // class (.av-count-idle), not by its title or :has().
+  const countClass = (key) => "av-chip av-count av-count-" + key;
 
   function el(tag, className, children = []) {
     const node = document.createElement(tag);
@@ -56,25 +77,29 @@
     const waitChip = button("av-chip av-wait", [dot("waiting"), waitCount, " need you", waitWho], cycleWaiting,
       "Show the next agent waiting on you");
     waitChip.hidden = true;
-    const badge = el("span", "av-chip av-badge", ["demo feed"]);
+    const badge = el("span", "av-chip av-badge", ["demo", el("span", "av-badge-more", [" feed"])]);
     badge.hidden = true;
-    const bar = el("div", "av-bar", [el("span", "av-chip av-title", [opts.title || "agentviz"]), waitChip]);
+    const bar = el("div", "av-bar" + (opts.oneRow ? " av-one-row" : ""),
+      [el("span", "av-chip av-title", [opts.title || "agentviz"]), waitChip]);
+    // oneRow: the counts and the badge scroll together; the rest stays put.
+    const strip = opts.oneRow ? el("div", "av-bar-scroll") : bar;
+    if (opts.oneRow) bar.appendChild(strip);
     for (const [key, word] of COUNTS) {
       counts[key] = el("b", "", ["0"]);
       const glyph = key === "followers" ? icon("followers") : dot(key);
-      const chip = el("span", "av-chip", [glyph, counts[key], el("span", "av-wide", [" " + word])]);
+      const chip = el("span", countClass(key), [glyph, counts[key], el("span", "av-wide", [" " + word])]);
       chip.title = word;
-      bar.appendChild(chip);
+      strip.appendChild(chip);
     }
-    bar.appendChild(badge);
+    strip.appendChild(badge);
     bar.appendChild(el("span", "av-spacer"));
-    for (const b of opts.buttons || []) bar.appendChild(button("av-chip", [icon(b.icon)], b.onClick, b.label));
+    for (const b of opts.buttons || []) bar.appendChild(button("av-chip av-btn", [icon(b.icon)], b.onClick, b.label));
     const legend = opts.legend || null;
     let legendButton = null;
     if (legend) {
       legend.classList.add("av-legend");
       legend.hidden = true;
-      legendButton = button("av-chip", ["?"], () => toggleLegend(), "What you are looking at");
+      legendButton = button("av-chip av-btn av-legend-btn", ["?"], () => toggleLegend(), "What you are looking at");
       legendButton.setAttribute("aria-expanded", "false");
       bar.appendChild(legendButton);
     }
@@ -226,8 +251,62 @@
         : "");
     };
     hud.panel = panel;
+    hud.bar = bar;
+
+    /* ------------------------------------------------------------ phone helpers */
+    // The panel where it comes to rest, in viewport pixels: offset* ignore
+    // the slide-in transform, so this is right mid-slide too. sheet: it spans
+    // the width (the phone's bottom sheet). Null while the panel is closed.
+    hud.panelRect = () => {
+      if (panel.hidden) return null;
+      const x0 = panel.offsetLeft, y0 = panel.offsetTop;
+      return {x0, y0, x1: x0 + panel.offsetWidth, y1: y0 + panel.offsetHeight,
+        sheet: panel.offsetWidth >= innerWidth - 40};
+    };
+    function frameOf(canvas) {
+      if (!canvas) return {left: 0, top: 0, W: innerWidth, H: innerHeight};
+      const r = canvas.getBoundingClientRect();
+      return {left: r.left, top: r.top, W: canvas.clientWidth, H: canvas.clientHeight};
+    }
+    const shift = (r, f, pad) => ({x0: r.x0 - f.left - pad, y0: r.y0 - f.top - pad, x1: r.x1 - f.left + pad,
+      y1: r.y1 - f.top + pad});
+    const barBottom = (f) => bar.getBoundingClientRect().bottom - f.top;
+    // What world labels keep clear of: the top bar's band (top) and the
+    // open panel and legend (avoid), padded by o.pad (4).
+    hud.clearArea = (canvas, o = {}) => {
+      const f = frameOf(canvas), pad = o.pad != null ? o.pad : 4, avoid = [];
+      const p = hud.panelRect();
+      if (p) avoid.push(shift(p, f, pad));
+      if (legend && !legend.hidden) {
+        const r = legend.getBoundingClientRect();
+        avoid.push(shift({x0: r.left, y0: r.top, x1: r.right, y1: r.bottom}, f, pad));
+      }
+      return {W: f.W, H: f.H, top: barBottom(f) + pad, avoid};
+    };
+    // The part of the canvas the HUD leaves uncovered, for framing a view:
+    // below the bar and, with o.panel (default true), clear of the panel.
+    hud.freeRect = (canvas, o = {}) => {
+      const f = frameOf(canvas), p = o.panel !== false ? hud.panelRect() : null;
+      return Screen.freeArea({W: f.W, H: f.H, top: barBottom(f), panel: p && shift(p, f, 0),
+        margin: o.margin != null ? o.margin : 8});
+    };
+    // keepClear, then StrataKit.placeLabels. With o.strataAvoid (a Strata
+    // kit whose placeLabels takes topInset / avoid, 1.4 on) the kit keeps
+    // the labels clear itself and keepClear only clamps them to the sides.
+    hud.placeLabels = (items, o = {}) => {
+      const area = hud.clearArea(o.canvas, o);
+      const place = Object.assign({}, o.place || {});
+      if (o.strataAvoid) {
+        Screen.keepClear(items, {W: area.W, H: area.H}, o.keep);
+        Object.assign(place, Screen.strataAvoid(area));
+      } else {
+        Screen.keepClear(items, area, o.keep);
+      }
+      (o.placeLabels || window.StrataKit.placeLabels)(items, place);
+      return items;
+    };
     return hud;
   }
 
-  window.AgentvizHud = {create};
-})();
+  return {create, COUNTS: COUNTS.map(([key, word]) => ({key, word})), countClass};
+});

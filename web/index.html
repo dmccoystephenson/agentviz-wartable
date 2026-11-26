@@ -43,17 +43,11 @@
   .av-label.branch { font: 600 10px/1 ui-monospace, Menlo, Consolas, monospace; background: #1a120a; color: #e8c070;
     border: 1px solid #a07a30; border-radius: 2px; padding: 2px 5px; }
   @media (prefers-reduced-motion: reduce) { .av-label.banner.waiting { animation: none; } }
-  /* Phones: the top bar stays one line. The title is in the tab already, the
-     idle and away counts give way to "need you", busy and subagents, and the
-     demo badge shortens. */
+  /* Phones: the idle and away counts give way to "need you", busy and
+     subagents. */
   @media (max-width: 640px) {
     .av-label.region { font-size: 13px; }
-    .av-bar { flex-wrap: nowrap; gap: 5px; align-items: flex-start; }
-    .av-bar .av-chip { padding: 4px 8px; gap: 4px; white-space: nowrap; flex: none; }
-    .av-bar .av-title, .av-bar > span.av-chip:has(.av-s-idle), .av-bar > span.av-chip:has(.av-s-offline) { display: none; }
-    .av-bar .av-badge { font-size: 0; gap: 0; }
-    .av-bar .av-badge::after { content: "demo"; font-size: 11px; }
-    .av-bar button.av-chip { min-width: 40px; padding: 4px; justify-content: center; }
+    .av-one-row .av-count-idle, .av-one-row .av-count-offline { display: none; }
     .av-label.banner { font-size: 12px; }
   }
   @media (max-width: 360px) { .av-bar .av-badge { display: none; } }
