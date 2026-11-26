@@ -90,7 +90,8 @@ sitting by it.*
 ![A stalled scout under grey smoke](docs/media/closeup-stalled-scout.png)
 
 *A stalled scout (`cache warm-up`): quiet for over five minutes without
-finishing, so grey smoke rises over its camp and its label turns grey.*
+finishing, so grey smoke rises over its camp and its label turns to a sooty
+plate that says "stalled". A stalled banner's label does the same.*
 
 ![Actions side by side](docs/media/closeup-actions.png)
 
@@ -125,10 +126,13 @@ many tool calls it has made. On the map such a scout carries a small plate
 with the branch under it, unless its lane label already names the branch,
 as this one's does.*
 
-<img src="docs/media/phone.png" alt="Phone portrait with the bottom sheet open on Thistle" width="300">
+<img src="docs/media/phone.png" alt="Phone portrait with the bottom sheet open on Wren, the map slid up so Wren stays in view" width="300">
 
-*On a phone (390 x 844 at DPR 3) you orbit with one finger and pinch to zoom.
-Tapping a banner opens a bottom sheet, shown here on Thistle.*
+*On a phone (390 x 844 at DPR 3) the regions are laid out deeper than wide,
+so the map fills the screen held upright, and the top bar keeps to one line
+(need you, busy, subagents). You orbit with one finger and pinch to zoom.
+Tapping a banner opens a bottom sheet, shown here on Wren; the map slides up
+so what you tapped stays in sight above the sheet.*
 
 ## Legend
 
@@ -142,7 +146,7 @@ Tapping a banner opens a bottom sheet, shown here on Thistle.*
 | A padlock / a "?" over the beacon | waiting on a permission prompt / on a question | closeup-waiting, closeup-question |
 | Banner still, low candle stub | `idle` (and `dim`, greyer) | closeup-idle-offline |
 | Banner lowered to a stump, greyed | `offline` | closeup-idle-offline |
-| Grey smoke rising from a banner or a scout | `stalled`: a session busy with nothing written for 5 min, or a subagent quiet that long without finishing | closeup-stalled-scout |
+| Grey smoke rising from a banner or a scout, a sooty "stalled" label | `stalled`: a session busy with nothing written for 5 min, or a subagent quiet that long without finishing | closeup-stalled-scout |
 | Gold burst from the finial, gold ring at the foot (a scout's pennant flashes gold) | a new tool call | motion.gif |
 | Smith's anvil, falling hammer, sparks | action `edit` | closeup-actions |
 | Catapult rolling, winding and throwing a stone | action `run` | closeup-lead |
