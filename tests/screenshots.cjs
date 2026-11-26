@@ -78,7 +78,7 @@ async function phone(browser, server) {
   if (!want("phone")) return;
   const {ctx, page, errors} = await openPage(browser, server, PHONE);
   await shoot(page, "phone",
-    "window.__shots.away('demo-waiting', 'demo-stalled', {turn: 0.5, pitch: 0.75, dist: 15, dx: -0.6}); window.__page.select('demo-waiting', false)");
+    "window.__page.select(null); window.__shots.home(); window.__page.select('demo-lead-a', false)");
   h.assertNoErrors(errors);
   await ctx.close();
 }

@@ -26,6 +26,11 @@
   .av-label.banner { font-size: 13px; font-weight: bold; border-radius: 3px; padding: 1px 8px 1px 6px;
     border: 0; border-left: 5px solid var(--field, #833); box-shadow: 0 1px 4px rgba(0, 0, 0, 0.6); }
   .av-label.banner.offline { opacity: 0.55; filter: grayscale(1); }
+  /* Idle banners step back so the busy and waiting ones read first. */
+  .av-label.banner.idle { opacity: 0.78; font-weight: normal; }
+  /* Stalled reads as soot: a dark plate, pale text, a smoky edge, lead or scout alike. */
+  .av-label.banner.stalled { background: #4a443e; color: #efe6d6; box-shadow: 0 0 0 1px #8a8178, 0 0 10px rgba(30, 26, 22, 0.9); }
+  .av-label.stalled .av-s-stalled { background: #cfc6b8; }
   .av-label.banner.waiting { background: #ffd27a; animation: wt-glow 1s ease-in-out infinite alternate; }
   .av-label.region { background: none; border: 0; font-style: italic; font-size: 15px; color: #f3e2b8; letter-spacing: 0.06em;
     text-shadow: 0 1px 3px #000, 0 0 6px #000; font-variant: small-caps; }
@@ -33,11 +38,25 @@
   .av-label.scout { background: none; border: 0; padding: 0 2px; font-size: 11px; color: #f3e2b8;
     text-shadow: 0 1px 2px #000, 0 0 4px #000; }
   .av-label.scout .av-ic { filter: drop-shadow(0 0 1px #f3e2b8); }
-  .av-label.scout.stalled { background: rgba(60, 55, 50, 0.85); border-radius: 3px; padding: 1px 6px 1px 4px; }
+  .av-label.scout.stalled { background: rgba(60, 55, 50, 0.92); border: 1px solid #8a8178; border-radius: 3px;
+    padding: 1px 6px 1px 4px; font-weight: bold; }
   .av-label.branch { font: 600 10px/1 ui-monospace, Menlo, Consolas, monospace; background: #1a120a; color: #e8c070;
     border: 1px solid #a07a30; border-radius: 2px; padding: 2px 5px; }
   @media (prefers-reduced-motion: reduce) { .av-label.banner.waiting { animation: none; } }
-  @media (max-width: 640px) { .av-label.region { font-size: 13px; } }
+  /* Phones: the top bar stays one line. The title is in the tab already, the
+     idle and away counts give way to "need you", busy and subagents, and the
+     demo badge shortens. */
+  @media (max-width: 640px) {
+    .av-label.region { font-size: 13px; }
+    .av-bar { flex-wrap: nowrap; gap: 5px; align-items: flex-start; }
+    .av-bar .av-chip { padding: 4px 8px; gap: 4px; white-space: nowrap; flex: none; }
+    .av-bar .av-title, .av-bar > span.av-chip:has(.av-s-idle), .av-bar > span.av-chip:has(.av-s-offline) { display: none; }
+    .av-bar .av-badge { font-size: 0; gap: 0; }
+    .av-bar .av-badge::after { content: "demo"; font-size: 11px; }
+    .av-bar button.av-chip { min-width: 40px; padding: 4px; justify-content: center; }
+    .av-label.banner { font-size: 12px; }
+  }
+  @media (max-width: 360px) { .av-bar .av-badge { display: none; } }
 
   .av-legend h3 { margin: 8px 0 4px; font-variant: small-caps; font-size: 14px; }
   .av-legend h3:first-child { margin-top: 0; }
@@ -56,7 +75,7 @@
     <li><span class="sw" style="background:var(--ember)"></span>Beacon fire on a hill: <b>waiting on you</b>; a "?" above it for a question, a padlock for a permission prompt</li>
     <li><span class="sw" style="background:var(--av-idle)"></span>Banner still, low candle: idle</li>
     <li><span class="sw" style="background:var(--av-off)"></span>Lowered grey banner: offline</li>
-    <li><span class="sw" style="background:var(--av-stall)"></span>Grey smoke: stalled (a banner busy, or a scout quiet, with nothing new for 5 min)</li>
+    <li><span class="sw" style="background:var(--av-stall)"></span>Grey smoke and a sooty "stalled" label: stalled (a banner busy, or a scout quiet, with nothing new for 5 min)</li>
     <li><span class="sw" style="background:#f6d15e"></span>A gold flash at the finial: a new tool call</li>
   </ul>
   <h3>What a banner is doing</h3>

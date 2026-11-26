@@ -81,7 +81,7 @@ async function checkFollowers(page) {
   check(found.stalled && found.branched, "the fixture should have a stalled subagent and one on its own branch");
   await page.evaluate(() => window.__page.kit.drive(1.2));
   const marked = await page.evaluate((label) => [...document.querySelectorAll(".av-label.scout.stalled")]
-    .some((el) => el.textContent === label), found.stalled.label);
+    .some((el) => el.textContent === label + " \u00b7 stalled"), found.stalled.label);
   check(marked, "the stalled subagent's scout label is not marked stalled");
   await page.evaluate((id) => window.__page.select(id, false), found.stalled.id);
   check(await page.locator(".av-panel .av-dot.av-s-stalled").count() > 0, "the stalled subagent's panel does not say so");

@@ -71,10 +71,12 @@
   }
 
   // Regions on a grid, each cell sized to the largest region, the last row
-  // centred, each region nudged inside its cell by its seed.
-  function placeOnGrid(regions) {
+  // centred, each region nudged inside its cell by its seed. The grid is
+  // wider than deep, or deeper than wide on a portrait screen (`tall`), so
+  // the map fills a phone held upright instead of a thin strip of it.
+  function placeOnGrid(regions, tall) {
     const n = Math.max(regions.length, 1);
-    const cols = Math.max(1, Math.ceil(Math.sqrt(n * 1.6))), rows = Math.ceil(n / cols);
+    const cols = Math.max(1, Math.ceil(Math.sqrt(n * (tall ? 0.45 : 1.6)))), rows = Math.ceil(n / cols);
     const cell = Math.max(4, ...regions.map((r) => r.R)) * 2 + 1.4;
     const w = cols * cell, d = rows * cell;
     regions.forEach((r, i) => {
@@ -87,13 +89,13 @@
     return [-w / 2 - MAP_MARGIN, -d / 2 - MAP_MARGIN - 0.6, w / 2 + MAP_MARGIN, d / 2 + MAP_MARGIN + 1.2];
   }
 
-  // Target positions for one document. Pure: the same document always lays
-  // out the same way.
-  function layout(doc) {
+  // Target positions for one document. Pure: the same document (and the
+  // same `tall`) always lays out the same way.
+  function layout(doc, tall) {
     const byPlace = groupByPlace(doc);
     const meta = new Map((doc.places || []).map((p) => [p.id, p]));
     const regions = [...byPlace.keys()].sort().map((id) => layRegion(id, byPlace.get(id), meta.get(id) || {}));
-    const map = placeOnGrid(regions);
+    const map = placeOnGrid(regions, !!tall);
     const banners = new Map(), dests = new Map();
     for (const r of regions) {
       for (const b of r.local) {
@@ -133,11 +135,20 @@
       this.banners = [];            // this frame's visible banners (frame, labels, picking)
       this.scouts = [];             // this frame's visible scouts
       this.seen = false;            // a first snapshot appears at once; later arrivals grow in
+      this.tall = false;            // portrait screen: lay the regions out deeper than wide
+    }
+
+    // A turned phone re-lays the map; banners and scouts ease to their new places.
+    setTall(tall) {
+      if (this.tall === !!tall) return false;
+      this.tall = !!tall;
+      if (this.doc) this.update(this.doc);
+      return true;
     }
 
     update(doc) {
       this.doc = doc;
-      const target = layout(doc);
+      const target = layout(doc, this.tall);
       this.mapTarget = target.map;
       if (!this.map) this.map = target.map.slice();
       this.regions = target.regions;
